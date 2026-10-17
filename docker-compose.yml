@@ -1,0 +1,24 @@
+
+services:
+  db:
+    image: postgres:17
+    container_name: usage-metering-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: usage_metering
+      POSTGRES_USER: usage_app
+      POSTGRES_PASSWORD: local_dev_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - usage_metering_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usage_app -d usage_metering"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  usage_metering_data:
+
+
