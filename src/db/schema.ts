@@ -15,6 +15,7 @@ import {
   index,
   check,
   foreignKey,
+  AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 import { relations, sql } from "drizzle-orm";
@@ -43,13 +44,26 @@ export const plans = pgTable(
 
     isPredefined: boolean("is_predefined").notNull().default(false),
 
+    ownerAccountId: integer("owner_account_id").references(
+      (): AnyPgColumn => accounts.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
     createdAt: timestamp("created_at", {
       withTimezone: true,
     })
       .notNull()
       .defaultNow(),
   },
-  (table) => [unique("uq_plans_scope_name").on(table.scope, table.name)],
+  (table) => [
+    uniqueIndex("uq_plans_shared_scope_name")
+      .on(table.scope, table.name)
+      .where(sql`${table.ownerAccountId} IS NULL`),
+    uniqueIndex("uq_plans_owner_scope_name")
+      .on(table.ownerAccountId, table.scope, table.name)
+      .where(sql`${table.ownerAccountId} IS NOT NULL`),
+  ],
 );
 
 export const planRules = pgTable("plan_rules", {

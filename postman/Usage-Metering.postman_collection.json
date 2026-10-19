@@ -1,0 +1,377 @@
+{
+  "info": {
+    "_postman_id": "7f48a7cb-0d34-4f10-b3c8-7f48a7cb0d34",
+    "name": "Usage Metering API",
+    "description": "End-to-end manual collection for account creation, users, plans, consumption, usage, history, and idempotency. Run requests in order. The API key is captured automatically after account creation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{apiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "apiKey",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "requestId",
+      "value": "postman-demo-request-001"
+    },
+    {
+      "key": "customPlanName",
+      "value": ""
+    },
+    {
+      "key": "customPlanId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health and plans",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('health is ok', () => pm.response.to.have.status(200));",
+                  "pm.test('returns status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List plans",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/plans",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('plans list returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('contains account and user plans', () => { const p = pm.response.json().plans; pm.expect(p.some(x => x.scope === 'account')).to.eql(true); pm.expect(p.some(x => x.scope === 'user')).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Account setup",
+      "item": [
+        {
+          "name": "Create account (captures API key)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Demo Account\",\n  \"planName\": \"Starter\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/accounts"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('account created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.expect(data.apiKey).to.be.a('string');",
+                  "pm.collectionVariables.set('apiKey', data.apiKey);",
+                  "pm.collectionVariables.set('accountId', String(data.account.id));",
+                  "console.log('API key stored in collection variable apiKey. Do not export/share it.');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create user (captures userId)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"externalUserId\": \"postman-customer-001\",\n  \"planName\": \"Basic\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('user created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('userId', String(data.user.id));",
+                  "console.log('userId captured:', data.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get user",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{userId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Consumption and usage",
+      "item": [
+        {
+          "name": "Consume 10 units",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"requestId\": \"{{requestId}}\",\n  \"units\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/consumptions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('decision is accepted or rejected', () => { pm.response.to.have.status(200); pm.expect(['accepted','rejected']).to.include(pm.response.json().status); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retry same request (idempotency)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"requestId\": \"{{requestId}}\",\n  \"units\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/consumptions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('same request replays original decision', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().idempotentReplay).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reuse requestId with different units (expect 409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"requestId\": \"{{requestId}}\",\n  \"units\": 11\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/consumptions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('changed replay input returns 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account usage",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/usage/account"
+          }
+        },
+        {
+          "name": "User usage",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/usage/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Consumption history",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/consumptions?limit=20&offset=0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Plan changes",
+      "item": [
+        {
+          "name": "Change user plan to Power",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planName\": \"Power\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/users/{{userId}}/plan"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('user plan updated', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change account plan to Growth",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planName\": \"Growth\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/accounts/plan"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('account plan updated', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

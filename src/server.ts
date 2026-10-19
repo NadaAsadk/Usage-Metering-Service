@@ -1,36 +1,29 @@
-import dotenv from "dotenv";
+import app from "./app";
+import { readConfig } from "./config/env";
 
-dotenv.config();
+const config = readConfig();
 
-import express from "express";
+const server = app.listen(config.port, () => {
+  console.log(`Usage Metering API listening on port ${config.port}`);
+});
 
-import accountsRouter from "./routes/accounts";
-import usersRouter from "./routes/users";
-import plansRouter from "./routes/plans";
-import consumptionsRouter from "./routes/consumptions";
-import usageRouter from "./routes/usage";
+function shutdown(signal: string) {
+  console.log(`${signal} received. Closing server...`);
 
-import { apiKeyAuth } from "./middleware/api-key-auth";
-
-const app = express();
-
-app.use(express.json());
-
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    service: "usage-metering",
+  server.close(async (error) => {
+    if (error) {
+      console.error("Failed to close HTTP server:", error);
+      process.exitCode = 1;
+    }
+    try {
+      const { conn } = await import("./db/index.js");
+      await conn.end();
+    } catch (shutdownError) {
+      console.error("Failed to close database connection:", shutdownError);
+      process.exitCode = 1;
+    }
   });
-});
+}
 
-app.use("/api/accounts", accountsRouter);
-app.use("/api/users", apiKeyAuth, usersRouter);
-app.use("/api/plans", plansRouter);
-app.use("/api/consumptions", apiKeyAuth, consumptionsRouter);
-app.use("/api/usage", apiKeyAuth, usageRouter);
-
-const port = Number(process.env.PORT ?? 3000);
-
-app.listen(port, () => {
-  console.log(`Usage Metering API listening on port ${port}`);
-});
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));

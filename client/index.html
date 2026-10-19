@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Usage Metering Demo</title>
+    <style>
+      :root {
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          sans-serif;
+        color: #172033;
+        background: #f4f6fa;
+        font-synthesis: none;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      header {
+        background: #182b45;
+        color: #fff;
+        padding: 24px max(20px, calc((100% - 1100px) / 2));
+      }
+      header h1 {
+        margin: 0 0 6px;
+        font-size: 25px;
+      }
+      header p {
+        margin: 0;
+        color: #dbe4f0;
+      }
+      main {
+        max-width: 1100px;
+        margin: 24px auto;
+        padding: 0 16px;
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .wide {
+        grid-column: 1/-1;
+      }
+      .panel {
+        background: white;
+        border: 1px solid #e0e6ef;
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 3px 12px #1720330a;
+      }
+      .panel h2 {
+        margin: 0 0 14px;
+        font-size: 17px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        color: #526078;
+        margin: 10px 0 5px;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        width: 100%;
+        padding: 10px 11px;
+        border-radius: 8px;
+        border: 1px solid #cbd4e1;
+        background: white;
+        color: #172033;
+      }
+      button {
+        background: #1e426a;
+        color: white;
+        border: 0;
+        font-weight: 650;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      button.secondary {
+        background: #e9eef5;
+        color: #233650;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .hint {
+        font-size: 12px;
+        color: #65738a;
+        line-height: 1.5;
+      }
+      .status {
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #edf3f9;
+        color: #203a5a;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .status.error {
+        background: #fff0ef;
+        color: #9a2924;
+      }
+      .status.success {
+        background: #e9f8ef;
+        color: #17613a;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        max-height: 340px;
+        overflow: auto;
+        background: #101a2b;
+        color: #dce7f8;
+        padding: 14px;
+        border-radius: 10px;
+        font-size: 12px;
+      }
+      .key {
+        font-family: ui-monospace, monospace;
+        overflow-wrap: anywhere;
+      }
+      .pill {
+        display: inline-block;
+        background: #e8eef7;
+        color: #27486c;
+        padding: 3px 8px;
+        border-radius: 99px;
+        font-size: 12px;
+      }
+      @media (max-width: 700px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+        .wide {
+          grid-column: auto;
+        }
+        .row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Usage Metering Service</h1>
+      <p>
+        Interactive demo for account quotas, user quotas, plan changes, and
+        idempotent consumption.
+      </p>
+    </header>
+    <main>
+      <section class="panel">
+        <h2>1. Create account</h2>
+        <label>Account name</label
+        ><input id="accountName" value="Demo Document App" /><label
+          >Account plan</label
+        ><select id="accountPlan"></select
+        ><button id="createAccount">Create account and API key</button>
+        <p class="hint">
+          The API key is shown once and kept only in this browser tab's session
+          storage for the demo.
+        </p>
+        <div id="accountState" class="status">No account created yet.</div>
+      </section>
+      <section class="panel">
+        <h2>2. Register users</h2>
+        <label>External user ID</label
+        ><input id="externalUserId" value="user_01" /><label>User plan</label
+        ><select id="userPlan"></select
+        ><button id="createUser">Register user</button>
+        <div class="row">
+          <div>
+            <label>Existing user</label
+            ><select id="userSelect"></select>
+          </div>
+          <div>
+            <label>Change selected user's plan</label
+            ><select id="newUserPlan"></select>
+          </div>
+        </div>
+        <button id="changeUserPlan" class="secondary">Change user plan</button>
+        <div id="userState" class="status">Create an account first.</div>
+      </section>
+      <section class="panel">
+        <h2>3. Simulate an action</h2>
+        <label>Units to consume</label
+        ><input id="units" type="number" min="1" step="1" value="10" /><label
+          >Request ID (keep same ID to demonstrate a retry)</label
+        ><input id="requestId" value="demo-request-001" /><button id="consume">
+          Consume units</button
+        ><button id="newRequest" class="secondary">
+          Generate new request ID
+        </button>
+        <p class="hint">
+          Try 10 units for an accepted request, then exceed a user's per-request
+          limit. Use several users to reach the shared account quota.
+        </p>
+      </section>
+      <section class="panel">
+        <h2>4. Change account plan</h2>
+        <label>New account plan</label
+        ><select id="newAccountPlan"></select
+        ><button id="changeAccountPlan">Change account plan</button
+        ><button id="refreshUsage" class="secondary">
+          Refresh usage and history
+        </button>
+        <div id="usageState" class="status">Usage not loaded yet.</div>
+      </section>
+      <section class="panel wide">
+        <h2>Activity log</h2>
+        <div id="notice" class="status">
+          Ready. Start by creating an account.
+        </div>
+        <pre id="log">No API requests yet.</pre>
+      </section>
+    </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let apiKey = sessionStorage.getItem("um_apiKey") || "";
+      let account = JSON.parse(sessionStorage.getItem("um_account") || "null");
+      let users = JSON.parse(sessionStorage.getItem("um_users") || "[]");
+      let plans = [];
+      const logLines = [];
+      function log(title, data) {
+        logLines.unshift(
+          `${new Date().toLocaleTimeString()}  ${title}\n${JSON.stringify(data, null, 2)}`,
+        );
+        $("log").textContent = logLines.join("\n\n").slice(0, 16000);
+      }
+      function notice(message, type = "") {
+        $("notice").textContent = message;
+        $("notice").className = "status " + type;
+      }
+      function setOptions(id, items, filter) {
+        const select = $(id);
+        select.replaceChildren();
+        for (const p of items.filter(filter)) {
+          const o = document.createElement("option");
+          o.value = p.name;
+          o.textContent = `${p.name} · ${p.monthlyAllowance.toLocaleString()} units/month · max ${p.maxUnitsPerRequest.toLocaleString()}`;
+          select.append(o);
+        }
+      }
+      async function request(path, { method = "GET", body, auth = true } = {}) {
+        const headers = { "content-type": "application/json" };
+        if (auth && apiKey) headers.authorization = `Bearer ${apiKey}`;
+        const res = await fetch(path, {
+          method,
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        const text = await res.text();
+        let data;
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = { raw: text };
+        }
+        log(`${method} ${path} → ${res.status}`, data);
+        if (!res.ok)
+          throw new Error(
+            data.message || data.error || `Request failed (${res.status})`,
+          );
+        return data;
+      }
+      function saveState() {
+        sessionStorage.setItem("um_apiKey", apiKey);
+        sessionStorage.setItem("um_account", JSON.stringify(account));
+        sessionStorage.setItem("um_users", JSON.stringify(users));
+      }
+      function renderAccount() {
+        $("accountState").innerHTML = account
+          ? `Account <b>#${account.id}</b> · ${escapeHtml(account.name)}<br><span class="pill">API key saved in this tab</span><p class="key">${escapeHtml(apiKey)}</p>`
+          : "No account created yet.";
+        setUserOptions();
+      }
+      function setUserOptions() {
+        const s = $("userSelect");
+        s.replaceChildren();
+        for (const u of users) {
+          const o = document.createElement("option");
+          o.value = u.id;
+          o.textContent = `#${u.id} · ${u.externalUserId} (${u.planName || "plan"})`;
+          s.append(o);
+        }
+        $("userState").textContent = users.length
+          ? `${users.length} user(s) registered in this demo.`
+          : "No users registered yet.";
+      }
+      function escapeHtml(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      }
+      async function loadPlans() {
+        const data = await request("/api/plans", { auth: false });
+        plans = data.plans || [];
+        setOptions("accountPlan", plans, (p) => p.scope === "account");
+        setOptions("newAccountPlan", plans, (p) => p.scope === "account");
+        setOptions("userPlan", plans, (p) => p.scope === "user");
+        setOptions("newUserPlan", plans, (p) => p.scope === "user");
+      }
+      $("createAccount").onclick = async () => {
+        try {
+          const data = await request("/api/accounts", {
+            method: "POST",
+            auth: false,
+            body: {
+              name: $("accountName").value,
+              planName: $("accountPlan").value,
+            },
+          });
+          account = data.account;
+          apiKey = data.apiKey;
+          users = [];
+          saveState();
+          renderAccount();
+          notice(
+            "Account created. Save the API key somewhere safe if you need it after this browser tab is closed.",
+            "success",
+          );
+        } catch (e) {
+          notice(e.message, "error");
+        }
+      };
+      $("createUser").onclick = async () => {
+        try {
+          if (!apiKey) throw Error("Create an account first.");
+          const data = await request("/api/users", {
+            method: "POST",
+            body: {
+              externalUserId: $("externalUserId").value,
+              planName: $("userPlan").value,
+            },
+          });
+          users.push({ ...data.user, planName: data.plan.name });
+          saveState();
+          setUserOptions();
+          notice(`User ${data.user.externalUserId} created.`, "success");
+        } catch (e) {
+          notice(e.message, "error");
+        }
+      };
+      $("changeUserPlan").onclick = async () => {
+        try {
+          const id = Number($("userSelect").value);
+          if (!id) throw Error("Register/select a user first.");
+          const data = await request(`/api/users/${id}/plan`, {
+            method: "PATCH",
+            body: { planName: $("newUserPlan").value },
+          });
+          const u = users.find((x) => x.id === id);
+          if (u) u.planName = data.plan.name;
+          saveState();
+          setUserOptions();
+          notice(
+            `User #${id} now uses ${data.plan.name}. Existing usage is preserved.`,
+            "success",
+          );
+          await refreshUsage();
+        } catch (e) {
+          notice(e.message, "error");
+        }
+      };
+      $("consume").onclick = async () => {
+        try {
+          const userId = Number($("userSelect").value);
+          if (!userId) throw Error("Register/select a user first.");
+          const units = Number($("units").value);
+          const requestId = $("requestId").value.trim();
+          const data = await request("/api/consumptions", {
+            method: "POST",
+            body: { userId, units, requestId },
+          });
+          notice(
+            `Decision: ${data.status || data.error || "unknown"}${data.rejectionReason ? " · " + data.rejectionReason : ""}`,
+            data.status === "accepted"
+              ? "success"
+              : data.status === "rejected"
+                ? "error"
+                : "",
+          );
+          await refreshUsage();
+        } catch (e) {
+          notice(e.message, "error");
+        }
+      };
+      $("newRequest").onclick = () => {
+        $("requestId").value = `demo-${crypto.randomUUID()}`;
+      };
+      $("changeAccountPlan").onclick = async () => {
+        try {
+          const data = await request("/api/accounts/plan", {
+            method: "PATCH",
+            body: { planName: $("newAccountPlan").value },
+          });
+          notice(
+            `Account plan changed to ${data.plan.name}. Existing usage is preserved.`,
+            "success",
+          );
+          await refreshUsage();
+        } catch (e) {
+          notice(e.message, "error");
+        }
+      };
+      async function refreshUsage() {
+        try {
+          if (!apiKey) throw Error("Create an account first.");
+          const [a, h] = await Promise.all([
+            request("/api/usage/account"),
+            request("/api/consumptions?limit=10&offset=0"),
+          ]);
+          let u = null;
+          const id = Number($("userSelect").value);
+          if (id) u = await request(`/api/usage/users/${id}`);
+          $("usageState").textContent = JSON.stringify(
+            { accountUsage: a, userUsage: u, latestHistory: h },
+            null,
+            2,
+          );
+          log("Usage and history refreshed", {
+            accountUsage: a,
+            userUsage: u,
+            latestHistory: h,
+          });
+        } catch (e) {
+          $("usageState").textContent = e.message;
+          notice(e.message, "error");
+        }
+      }
+      $("refreshUsage").onclick = refreshUsage;
+      (async () => {
+        try {
+          await loadPlans();
+          if (account && apiKey) {
+            renderAccount();
+            notice(
+              "Restored the account from this browser tab session.",
+              "success",
+            );
+          } else renderAccount();
+        } catch (e) {
+          notice(`Could not load plans: ${e.message}`, "error");
+        }
+      })();
+    </script>
+  </body>
+</html>
